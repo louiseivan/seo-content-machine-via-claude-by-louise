@@ -1,4 +1,4 @@
-# Ryder SEO Content Machine
+# SEO Content Machine via Claude by Louise
 
 An automated SEO blog pipeline built in one day with [Claude Code](https://claude.com/claude-code), running in production at [ryder.id](https://ryder.id) (Ryder makes the Ryder One hardware wallet). Published here so other teams can borrow the architecture.
 
