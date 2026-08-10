@@ -1,0 +1,24 @@
+# Whitelist repo: only the content machine is tracked.
+/*
+!/.gitignore
+!/README.md
+!/LICENSE
+!/CLAUDE OUTPUTS/
+!/ryder-shopify-autopilot/
+
+# Secrets — never commit these
+CLAUDE OUTPUTS/Ryder One/shopify.env
+CLAUDE OUTPUTS/Ryder One/gsc-service-account.json
+*.env
+!*.env.example
+*service-account*.json
+
+# Internal-only documents (stay local + in Notion, not in the public repo)
+CLAUDE OUTPUTS/Ryder One/RYDER_CONTENT_SYSTEM_PROMPT.md
+CLAUDE OUTPUTS/Ryder One/CONTENT-MACHINE-SETUP.md
+CLAUDE OUTPUTS/Ryder One/Ryder-SEO-Automation-Playbook.pdf
+CLAUDE OUTPUTS/Ryder One/outputs/
+
+# OS noise
+.DS_Store
+**/.DS_Store

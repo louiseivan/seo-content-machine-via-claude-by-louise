@@ -1,0 +1,14 @@
+{
+  "slug": "coldcard-entropy-incident-explained",
+  "title": "The Coldcard Entropy Incident, Explained: What It Means for Your Bitcoin",
+  "seo_title": "The Coldcard Entropy Incident, Explained | Ryder",
+  "meta_description": "The 2026 Coldcard entropy bug let attackers guess wallet seeds and drain 116 million USD in Bitcoin. What happened, who is affected, and what to do now.",
+  "hero_alt": "Ryder self-custody hardware wallet next to a Recovery Tag, illustrating backup without a single point of failure",
+  "target_keyword": "coldcard",
+  "blog_categories_raw": [
+    "Industry Insights"
+  ],
+  "content_angle": "Explain the 2026 Coldcard entropy incident without gloating, then land the single-point-of-failure lesson on TapSafe Recovery",
+  "hero_subtitle": "What went wrong, who's affected, and what to do now",
+  "hero_colorway": "light"
+}
