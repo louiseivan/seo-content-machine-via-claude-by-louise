@@ -17,7 +17,11 @@ Env overrides:
     PUSH_ANNOUNCE=0          skip the Slack announcement
 
 Usage:
-    REGEN_BUDGET_S=38 timeout 41 python3 push_articles.py
+    REGEN_BUDGET_S=38 perl -e 'alarm 41; exec @ARGV' python3 push_articles.py
+
+    (macOS ships no `timeout`/`gtimeout`; the perl alarm is the portable
+    stand-in for the outer backstop. It exits 142 when it fires, so it
+    never collides with this script's exit 2 = "articles remaining".)
 """
 
 import glob
@@ -31,9 +35,16 @@ import common
 from common import (ARTICLE_TAG, ARTICLE_URL_PATTERN, BODIES_DIR,
                     DEFAULT_MANIFEST, HEROES_DIR, RESULTS_FILE, REWRITES_DIR,
                     SHOPIFY_BLOG_ID, b64_file, load_env, md_to_html,
-                    notion_mark_published, shopify, slack_announce)
-from generate_visuals import generate_hero
+                    notion_mark_published, notion_page_owners, shopify,
+                    slack_announce)
+from generate_visuals import BRAND_DIR, generate_hero
 from prepublish_check import check_article
+
+
+def topic_art_path(slug):
+    """Per-article engraving from SKILL.md step 4. Its absence means the hero
+    fell back to the generic gravure texture, which must never be announced."""
+    return os.path.join(BRAND_DIR, "art", f"{slug}.png")
 
 # Explicit slug -> body file overrides (setup guide step 7). The default
 # resolution order below finds staged bodies without an entry here.
@@ -78,6 +89,20 @@ def article_exists(slug):
 def push_one(item, dry_run=False):
     slug = item["slug"]
     live_url = ARTICLE_URL_PATTERN.format(handle=slug)
+
+    # Hard rule: autopilot never publishes (and so never re-statuses) a
+    # page a human owns. Checked here, not just at manifest-build time, so
+    # a manifest built by any other route still can't slip one through.
+    # Fails closed: an unverifiable page is skipped, not published.
+    page_id = item.get("notion_page_id")
+    if page_id:
+        ok, owners = notion_page_owners(page_id)
+        if not ok:
+            return {"slug": slug, "ok": False,
+                    "error": f"owner check failed: {owners}"}
+        if owners:
+            return {"slug": slug, "ok": False, "terminal": True,
+                    "error": "skipped: human-owned (" + ", ".join(owners) + ")"}
 
     body_path = find_body(slug)
     if not body_path:
@@ -147,7 +172,16 @@ def push_one(item, dry_run=False):
         if not ok:
             result["notion_error"] = str(err)[:200]
 
-    if os.environ.get("PUSH_ANNOUNCE", "1") == "1":
+    # Never announce a post that shipped on the fallback gravure art. The
+    # publish itself still goes through (SKILL.md step 4 says art failure
+    # must not block it), but Slack is the shop window: generate the topic
+    # engraving, re-run the hero, then announce.
+    if not os.path.exists(topic_art_path(slug)):
+        result["slack_announced"] = False
+        result["slack_skipped"] = ("no topic artwork at assets/brand/art/"
+                                   f"{slug}.png; generate it per visual-system.md, "
+                                   "rebuild the hero, then announce")
+    elif os.environ.get("PUSH_ANNOUNCE", "1") == "1":
         ok, err = slack_announce(item["title"],
                                  item.get("content_angle", ""), live_url)
         result["slack_announced"] = ok
@@ -167,6 +201,18 @@ def main():
     with open(manifest_path) as f:
         manifest = json.load(f)
 
+    # Pre-flight: surface missing topic art before anything publishes, so the
+    # step-4 engraving gets generated up front rather than noticed afterwards.
+    missing_art = [i["slug"] for i in manifest
+                   if not os.path.exists(topic_art_path(i["slug"]))]
+    if missing_art:
+        print(f"WARNING: no topic artwork for {len(missing_art)} article(s); "
+              "these will publish on the fallback gravure and will NOT be "
+              "announced in Slack:")
+        for slug in missing_art:
+            print(f"  - {slug}")
+        print("  generate per visual-system.md into assets/brand/art/<slug>.png")
+
     results = load_results()
     done = {r["slug"] for r in results if r.get("ok")}
 
@@ -179,11 +225,21 @@ def main():
         outcome = push_one(item, dry_run=dry_run)
         results = [r for r in results if r["slug"] != item["slug"]] + [outcome]
         save_results(results)
+        # Enter the index watch at push time, not at check time. The manifest
+        # is rewritten for every new batch, so anything that reads it later
+        # has already lost this slug — indexing takes days, batches take hours.
+        if outcome.get("ok") and not dry_run:
+            from index_watch import add_items
+            add_items([item])
         tag = "OK " if outcome.get("ok") else "ERR"
         print(f"{tag} {item['slug']} -> {outcome.get('live_url', outcome.get('error'))}")
 
-    remaining = [i["slug"] for i in manifest
-                 if i["slug"] not in {r["slug"] for r in results if r.get("ok")}]
+    # Terminally-skipped articles (human-owned) are settled, not pending:
+    # counting them as remaining would hold the exit code at 2 and spin the
+    # caller's retry loop for nothing. They stay out of `done` above, so a
+    # later run re-checks them if ownership changes.
+    settled = {r["slug"] for r in results if r.get("ok") or r.get("terminal")}
+    remaining = [i["slug"] for i in manifest if i["slug"] not in settled]
     print(f"done: {len(manifest) - len(remaining)}/{len(manifest)}"
           + (f", remaining: {', '.join(remaining)}" if remaining else ""))
     sys.exit(0 if not remaining else 2)

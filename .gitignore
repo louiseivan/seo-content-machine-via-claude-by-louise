@@ -37,3 +37,28 @@ CLAUDE OUTPUTS/Ryder One/outputs/
 **/.DS_Store
 **/__pycache__/
 *.pyc
+
+# standalone repo, pushed separately to github.com/louiseivan
+trustpilot-reviews-scraper/
+
+# Production content queue. Stays local: push_articles.find_body() globs this
+# directory for article bodies at publish time, so the machine needs it on
+# disk, but only the five sample articles below ship in this repo.
+CLAUDE OUTPUTS/Ryder One/rewrites/*
+!CLAUDE OUTPUTS/Ryder One/rewrites/new-66-*
+!CLAUDE OUTPUTS/Ryder One/rewrites/new-67-*
+!CLAUDE OUTPUTS/Ryder One/rewrites/new-68-*
+!CLAUDE OUTPUTS/Ryder One/rewrites/new-69-*
+!CLAUDE OUTPUTS/Ryder One/rewrites/new-70-*
+
+# Per-article cover engravings from generate_visuals.py. Five tracked to
+# match the sample articles; the rest are Ryder brand output.
+ryder-shopify-autopilot/assets/brand/art/*
+!ryder-shopify-autopilot/assets/brand/art/coldcard-entropy-incident-explained.png
+!ryder-shopify-autopilot/assets/brand/art/tangem-vs-ryder-one.png
+!ryder-shopify-autopilot/assets/brand/art/cold-storage-setup-guide-2026.png
+!ryder-shopify-autopilot/assets/brand/art/trezor-safe-7-vs-ryder-one.png
+!ryder-shopify-autopilot/assets/brand/art/best-crypto-wallet-for-beginners-2026.png
+
+# Scrape cache: third-party page content, never republished
+.firecrawl/

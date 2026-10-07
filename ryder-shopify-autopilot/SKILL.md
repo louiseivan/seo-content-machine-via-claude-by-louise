@@ -44,8 +44,10 @@ and must never be echoed in output or logs.
 5. Run the push in budget slices until complete:
    ```bash
    cd /Users/l/CodingStudio/ryder-shopify-autopilot
-   REGEN_BUDGET_S=38 timeout 41 python3 push_articles.py
+   REGEN_BUDGET_S=38 perl -e 'alarm 41; exec @ARGV' python3 push_articles.py
    ```
+   macOS has no `timeout`/`gtimeout` binary, so the perl alarm stands in
+   for it: same hard backstop, no install. It exits 142 when it fires.
    Repeat while the exit code is 2 (articles remaining). The script
    handles the editorial gate, hero generation (topic art + colorway per
    visual-system.md), dedup, the Notion Published update, and the Slack
@@ -64,8 +66,18 @@ and must never be echoed in output or logs.
 ## Hard rules
 
 - Gate failures stop that article; never set `PUSH_SKIP_CHECKLIST=1`.
+- Step 4 is not optional. Every article gets its own engraving at
+  `assets/brand/art/<slug>.png` before the push. `push_articles.py`
+  warns up front about any manifest entry missing art and refuses to
+  announce that article in Slack, because the fallback gravure must
+  never go out as a launch. If art generation fails, the publish still
+  proceeds (per step 4), but fix the art and rebuild the hero before
+  announcing.
 - Never delete anything in Shopify or Notion (the API layer only allows
   GET/POST/PUT).
 - Tag is exactly `Industry Insights`; the scripts enforce this.
-- Do not change the status of articles owned by Nish.
+- Do not change the status of any human-owned page. A page is
+  human-owned if its Notion `Owner` people property has any value;
+  autopilot only publishes pages with an empty `Owner`. Skip owned pages
+  at manifest-build time and list them as "skipped: human-owned (<name>)".
 - If Shopify auth fails, report it and stop; do not retry in a loop.

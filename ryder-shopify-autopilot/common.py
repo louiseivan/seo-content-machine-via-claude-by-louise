@@ -145,6 +145,27 @@ def notion(method, path, payload=None):
                 }, payload=payload)
 
 
+def notion_page_owners(page_id):
+    """Names on the page's `Owner` people property.
+
+    Returns (True, [names]) on a clean lookup, or (False, reason) if the
+    lookup itself failed. Callers must fail closed on (False, ...): an
+    unverifiable page is treated as owned, never as unowned.
+    """
+    status, body = notion("GET", f"pages/{page_id}")
+    if status != 200 or not isinstance(body, dict):
+        return False, f"notion HTTP {status}"
+    props = body.get("properties", {})
+    prop = props.get("Owner")
+    if not isinstance(prop, dict) or prop.get("type") != "people":
+        prop = next((p for p in props.values()
+                     if isinstance(p, dict) and p.get("type") == "people"), None)
+    if prop is None:
+        return True, []
+    return True, [p.get("name") or p.get("id", "unknown")
+                  for p in prop.get("people", [])]
+
+
 def notion_mark_published(page_id, live_url):
     status, body = notion("PATCH", f"pages/{page_id}", {
         "properties": {
