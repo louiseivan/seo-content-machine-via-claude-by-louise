@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "synthetic_example": true,
+  "topics": [
+    {
+      "keyword": "move bitcoin from exchange to hardware wallet",
+      "persona": "exchange_holder",
+      "buyer_intent": "how_to_buy",
+      "buyer_question": "How do I choose and set up my first hardware wallet before moving coins off an exchange?",
+      "angle": "Walk through the decision, recovery questions, and a safe transfer sequence.",
+      "product_fit": {"verified": true, "verified_by": "Example product reviewer", "verified_on": "2026-10-07", "rationale": "The reviewed use case is a first hardware wallet purchase."},
+      "serp": {"intent_match": true, "country": "US", "reviewed_on": "2026-10-07", "source_url": "https://www.google.com/search?q=move+bitcoin+from+exchange+to+hardware+wallet", "notes": "Synthetic review: assume results answer transfer and purchase questions; verify live before real drafting."},
+      "existing_coverage": {"status": "none", "checked_on": "2026-10-07", "source": "Synthetic site inventory review"},
+      "evidence": [{"claim": "A transfer requires checking the destination address.", "source_url": "https://example.com/synthetic-source", "checked_on": "2026-10-07"}]
+    },
+    {
+      "keyword": "crypto trading bot signals",
+      "persona": "exchange_holder",
+      "buyer_intent": "decision",
+      "product_fit": {"verified": false, "rationale": "Trading signals do not support the wallet purchase use case."},
+      "serp": {},
+      "existing_coverage": {},
+      "evidence": []
+    },
+    {
+      "keyword": "how to set up a hardware wallet",
+      "persona": "exchange_holder",
+      "buyer_intent": "how_to_buy",
+      "product_fit": {"verified": true, "verified_by": "Example product reviewer", "verified_on": "2026-10-07", "rationale": "The setup topic fits a first wallet purchase."},
+      "serp": {},
+      "existing_coverage": {"status": "existing", "url": "https://ryder.id/blogs/post/example-existing-guide", "checked_on": "2026-10-07", "source": "Synthetic site inventory review"},
+      "evidence": []
+    },
+    {
+      "keyword": "hardware wallet recovery checklist",
+      "persona": "exchange_holder",
+      "buyer_intent": "informational",
+      "product_fit": {"verified": null},
+      "serp": {},
+      "existing_coverage": {},
+      "evidence": []
+    }
+  ]
+}

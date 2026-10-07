@@ -1,9 +1,16 @@
 ---
 name: ryder-shopify-autopilot
-description: Publish approved Ryder blog articles from Notion to Shopify automatically. Queries the Notion content database for articles with Status "Approved", runs the editorial gate, pushes them to the Shopify blog with a generated hero image, marks them Published in Notion with the live URL, and announces in Slack. Use on a schedule (hourly) or when asked to "publish approved articles" or "run the autopilot".
+description: Publish approved Ryder blog articles from Notion to Shopify automatically. Queries the Notion content database for articles with Status "Approved for publishing", runs the editorial gate, pushes them to the Shopify blog with a generated hero image, marks them Published in Notion with the live URL, and announces in Slack. Use on a configured schedule or when asked to "publish approved articles" or "run the autopilot".
 ---
 
 # Ryder Shopify Autopilot
+
+For new article ideas or drafts, first use
+`.claude/skills/ryder-buyer-seo/SKILL.md`. This skill starts only after a
+human has set the Notion page status to `Approved for publishing`. The
+selector's `draft_brief` result never constitutes publishing approval.
+The scheduled-agent step below filters Notion status; `push_articles.py`
+itself trusts its manifest and does not recheck that status.
 
 Runs unattended. All constants and credential handling live in
 `common.py`; credentials come from `CLAUDE OUTPUTS/Ryder One/shopify.env`

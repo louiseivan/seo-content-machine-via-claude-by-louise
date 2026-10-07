@@ -21,6 +21,8 @@ Usage:
 """
 
 import base64
+import datetime
+import json
 import os
 import sys
 import urllib.parse
@@ -146,16 +148,37 @@ def research(mode, arg, limit=50):
 
 
 def main():
-    load_env()
-    if len(sys.argv) < 3:
+    load_env(required_keys=())
+    args = [a for a in sys.argv[1:] if a != "--json"]
+    as_json = "--json" in sys.argv[1:]
+    if len(args) < 2:
         raise SystemExit(__doc__)
-    mode, arg = sys.argv[1], sys.argv[2]
+    mode, arg = args[0], args[1]
     if mode not in ("overview", "matching", "related"):
         raise SystemExit(f"unknown mode {mode}")
     if mode == "overview":
         arg = [k.strip() for k in arg.split(",")]
-    limit = int(sys.argv[3]) if len(sys.argv) > 3 else 50
+    limit = int(args[2]) if len(args) > 2 else 50
     rows, notes = research(mode, arg, limit)
+    if as_json:
+        # Explicit nulls preserve the distinction between no provider value
+        # and an observed zero. Provider errors remain in notes.
+        for row in rows:
+            for provider in ("d4s", "ahrefs"):
+                row.setdefault(f"{provider}_volume", None)
+                row.setdefault(f"{provider}_difficulty", None)
+        print(json.dumps({"schema_version": 1, "country": "US",
+                          "language": LANGUAGE,
+                          "collected_on": datetime.date.today().isoformat(),
+                          "providers": [name for name, prefix in
+                                        (("DataForSEO", "d4s"), ("Ahrefs", "ahrefs"))
+                                        if any(r.get(prefix + "_volume") is not None or
+                                               r.get(prefix + "_difficulty") is not None
+                                               for r in rows)],
+                          "metric_sources": {"d4s": "DataForSEO Labs Google",
+                                             "ahrefs": "Ahrefs Keywords Explorer"},
+                          "mode": mode, "rows": rows, "notes": notes}, indent=2))
+        return
     for n in notes:
         print(f"note: {n}", file=sys.stderr)
     fmt = lambda v: "?" if v is None else v

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "synthetic_example": true,
+  "country": "US",
+  "language": "en",
+  "collected_on": "2026-10-07",
+  "providers": ["DataForSEO", "Ahrefs"],
+  "metric_sources": {"d4s": "Synthetic DataForSEO-shaped values", "ahrefs": "Synthetic Ahrefs-shaped values"},
+  "notes": ["Synthetic values for offline demonstration only."],
+  "rows": [
+    {"keyword": "move bitcoin from exchange to hardware wallet", "d4s_volume": 30, "d4s_difficulty": 12, "ahrefs_volume": null, "ahrefs_difficulty": null},
+    {"keyword": "crypto trading bot signals", "d4s_volume": 10000, "d4s_difficulty": 72, "ahrefs_volume": 9000, "ahrefs_difficulty": 69},
+    {"keyword": "how to set up a hardware wallet", "d4s_volume": 250, "d4s_difficulty": 35, "ahrefs_volume": 0, "ahrefs_difficulty": 31},
+    {"keyword": "hardware wallet recovery checklist", "d4s_volume": null, "d4s_difficulty": null, "ahrefs_volume": null, "ahrefs_difficulty": null}
+  ]
+}

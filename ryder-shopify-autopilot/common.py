@@ -16,7 +16,7 @@ import urllib.request
 
 # ---------------------------------------------------------------- paths
 
-BASE_DIR = "/Users/l/CodingStudio"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RYDER_DIR = os.path.join(BASE_DIR, "CLAUDE OUTPUTS", "Ryder One")
 AUTOPILOT_DIR = os.path.join(BASE_DIR, "ryder-shopify-autopilot")
 ENV_FILE = os.path.join(RYDER_DIR, "shopify.env")
@@ -49,23 +49,24 @@ NOTION_VERSION = "2022-06-28"
 SLACK_CHANNEL_ID = "C0B2ARN0Y01"  # #ws-blogs-published
 
 
-def load_env(path=ENV_FILE):
+PUBLISH_KEYS = ("SHOPIFY_SHOP", "SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET",
+                "NOTION_API_KEY", "SLACK_BOT_TOKEN")
+
+
+def load_env(path=ENV_FILE, required_keys=PUBLISH_KEYS):
     """Parse shopify.env into os.environ. Values never get printed."""
-    if not os.path.exists(path):
-        raise SystemExit(f"credentials file missing: {path}")
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, val = line.partition("=")
-            os.environ.setdefault(key.strip(), val.strip())
-    missing = [k for k in ("SHOPIFY_SHOP", "SHOPIFY_CLIENT_ID",
-                           "SHOPIFY_CLIENT_SECRET", "NOTION_API_KEY",
-                           "SLACK_BOT_TOKEN")
+    if os.path.exists(path):
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                os.environ.setdefault(key.strip(), val.strip())
+    missing = [k for k in required_keys
                if not os.environ.get(k) or os.environ[k] == "REPLACE_ME"]
     if missing:
-        raise SystemExit(f"shopify.env is missing values for: {', '.join(missing)}")
+        raise SystemExit(f"credentials missing for: {', '.join(missing)}")
 
 
 # ---------------------------------------------------------------- http
