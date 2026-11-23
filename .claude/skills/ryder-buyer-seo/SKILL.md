@@ -11,6 +11,13 @@ referral topics are secondary. Advanced PSBT and power-user topics are
 deprioritized. Search volume is a signal only after buyer fit and evidence.
 These priorities are a public strategy summary, not a private ICP document.
 
+Grok X Bot only queues topic seeds and source context. It never supplies search
+volume, keyword difficulty, SERP review, or `product_fit`. Treat its `keyword`
+as an unverified seed, regardless of likes or claims in the evidence. Keyword
+research stays in this repository: always run `keyword_research.py` and a live
+US SERP inspection for every queued topic. Never infer verified demand from
+Grok's suggestion.
+
 Unvalidated seed ideas to research: exchange-to-wallet transfer and first
 wallet setup; beginner purchase comparisons and recovery choices; switching
 from another hardware wallet. These are prompts for investigation, not
@@ -25,13 +32,18 @@ does not establish product fit.
    `python3 ryder-shopify-autopilot/notion_topic_intake.py --dry-run --output /tmp/ryder-topics.json`.
    This reads Notion, prefers `Content type` containing `Blog`, and skips
    human-owned pages or failed owner lookups. It prints candidates, planned
-   `keyword_research.py overview --json` calls (US/en), and planned status
-   writes. No Notion writes or paid research occur in dry-run by default;
+   `keyword_research.py overview --json` calls (US/en), required Claude/human
+   SERP checks, and planned status writes. No Notion writes or paid research
+   occur in dry-run by default;
    `--research-in-dry-run` explicitly allows research, never writes.
    Run intake with `--output /tmp/ryder-topics.json --research-output /tmp/ryder-keywords.json`
-   to run research for unknown volumes, invoke `topic_selector.py`, and
-   write each decision note onto its original page. Missing metrics stay
-   null. The queue is the system of record; keep `notion_page_id` throughout.
+   to run fresh research for every seed, invoke `topic_selector.py`, and
+   write each decision note onto its original page. Live runs always call
+   the repository's research command, including reviewed reruns and claims;
+   existing metrics never skip it. `--research PATH` is for dry-run previews
+   only; a live run replaces it with fresh provider output. Missing metrics
+   stay null and never fall back to Grok claims or cached values. The queue
+   is the system of record; keep `notion_page_id` throughout.
    Without Notion credentials, start with local keyword candidates. With
    research-provider credentials configured, run from the repository root:
    `python3 ryder-shopify-autopilot/keyword_research.py matching "hardware wallet" 50 --json > /tmp/ryder-keywords.json`.
@@ -49,18 +61,25 @@ does not establish product fit.
    review objects. Intake does not fabricate `product_fit`, `serp`, or a
    coverage review date: absent reviews naturally mean `research_needed`.
    A human/Claude must actually check product fit and record reviewer, date,
-   and rationale. Record a dated US SERP inspection with its URL and intent
-   notes, a dated existing-content inventory source, and dated sources for
-   claims with HTTP(S) source URLs. Use null for unknown provider metrics;
+   and rationale. For every queued seed, inspect the live US search results
+   in English, check buyer intent and competing page types, then record the
+   actual query/result URL, intent notes, and today's `serp.reviewed_on`.
+   This inspection is the Claude/human step, not an automated SERP API in
+   this repo. Keyword overview does not perform it. Old notes and Grok's X
+   sources cannot substitute for the check; if it cannot be completed, do
+   not claim or draft the topic. Intake requires a current-day SERP review
+   before a `draft_brief` can pass. Also record a dated inventory source and
+   dated claims with HTTP(S) source URLs. Use null for unknown provider metrics;
    zero means a measured zero. The selector validates shape and date, while
    the human must assess source quality and factual accuracy.
 3. Run `python3 ryder-shopify-autopilot/topic_selector.py --candidates
    /path/to/candidates.json --research /tmp/ryder-keywords.json --pretty`.
    Store outputs locally; inspect `research_needed` reasons and fill gaps.
    The research JSON records country, collection date, providers, and notes.
-   Stale/future research or review older than 120 days is held for research.
+   The standalone selector holds stale/future research or reviews older than
+   120 days; Notion intake additionally requires today's SERP inspection.
    For Notion-origin topics, apply reviewed results through
-   `notion_topic_intake.py --candidates /tmp/ryder-topics.json --research /tmp/ryder-keywords.json`.
+   `notion_topic_intake.py --candidates /tmp/ryder-topics.json --research-output /tmp/ryder-keywords.json`.
    It rechecks the original page's ownership, workflow stage, keyword and
    coverage binding, then recomputes the selector result; never supply a
    hand-written decision. Synthetic examples cannot mutate live pages.
@@ -71,7 +90,7 @@ does not establish product fit.
    `Research needed`. `reject` stays out of the active calendar: set the
    existing page's Status to `Archived` and keep the note; never delete it.
    When Claude starts writing one `draft_brief`, claim it explicitly with
-   `notion_topic_intake.py --candidates /tmp/ryder-topics.json --research /tmp/ryder-keywords.json --claim PAGE_ID`.
+   `notion_topic_intake.py --candidates /tmp/ryder-topics.json --claim PAGE_ID`.
    Only that page moves to `Drafting`. A brief alone never changes it to
    `Drafting`. The 0-100 score is a deterministic priority heuristic, not a
    traffic, ranking, or conversion forecast. Read the brief's buyer question,
@@ -105,7 +124,7 @@ python3 ryder-shopify-autopilot/topic_selector.py \
 ```
 
 This repo contains the skill and command but does not install an external
-Claude schedule or run research automatically. If using a scheduled Claude
+Claude schedule or run on its own. If using a scheduled Claude
 task, make topic research and this selection sequence its first steps. Keep
 all private ICP source material, credentials, internal metrics, and screenshots
 outside this public repository.

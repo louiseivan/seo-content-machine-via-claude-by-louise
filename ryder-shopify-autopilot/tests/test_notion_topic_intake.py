@@ -53,7 +53,8 @@ class NotionIntakeTests(unittest.TestCase):
         no_network = patch.object(common, "http", side_effect=AssertionError("network forbidden"))
         no_network.start()
         self.addCleanup(no_network.stop)
-        paid = patch.object(intake.subprocess, "run", side_effect=AssertionError("paid research forbidden"))
+        paid = patch.object(intake.subprocess, "run", return_value=
+                            subprocess.CompletedProcess([], 0, json.dumps(research_fixture())))
         self.paid = paid.start()
         self.addCleanup(paid.stop)
 
@@ -84,6 +85,19 @@ class NotionIntakeTests(unittest.TestCase):
             self.assertNotIn(key, topic)
         self.assertNotIn("checked_on", topic["existing_coverage"])
 
+    def test_grok_evidence_is_not_verified_demand_or_reviews(self):
+        self.page["properties"]["evidence"]["rich_text"] = [{"plain_text": json.dumps([
+            {"claim": "Synthetic Grok claim: high search volume and good product fit",
+             "source_url": "https://example.com/synthetic-post", "checked_on": TODAY.isoformat()}
+        ])}]
+        result = self.run_intake()
+        self.paid.assert_called_once()
+        decision = result["decisions"][0]
+        self.assertEqual(decision["decision"], "research_needed")
+        self.assertEqual(decision["metrics"]["d4s"]["volume"], 0)
+        self.assertTrue(any("product fit" in reason for reason in decision["reasons"]))
+        self.assertTrue(any("SERP" in reason for reason in decision["reasons"]))
+
     def test_plain_json_autolinks_and_bad_evidence(self):
         self.assertEqual(intake.parse_evidence('[{"source_url":"[source](https://example.com/a_b)"}]'),
                          [{"source_url": "https://example.com/a_b"}])
@@ -110,6 +124,8 @@ class NotionIntakeTests(unittest.TestCase):
         self.assertEqual(result["candidates"]["schema_version"], 1)
         self.assertEqual(result["planned_keyword_research_calls"][0][-3:],
                          ["overview", "first hardware wallet", "--json"])
+        self.assertEqual(result["planned_serp_checks"], [{"page_id": PAGE_ID,
+                         "keyword": "first hardware wallet", "country": "US", "language": "en"}])
         self.assertEqual(result["planned_status_writes"][0]["status"], "Research needed")
         self.assertEqual(result["decisions"][0]["decision"], "research_needed")
         self.assertTrue(any("product fit" in r for r in result["decisions"][0]["reasons"]))
@@ -133,15 +149,46 @@ class NotionIntakeTests(unittest.TestCase):
         self.assertEqual(result["research"]["country"], "US")
         self.assertEqual(self.page["properties"]["Status"]["status"]["name"], "Research needed")
 
-    def test_measured_zero_reused_and_only_status_written(self):
-        result = self.run_intake(research=research_fixture())
-        self.paid.assert_not_called()
+    def test_live_research_always_replaces_cached_metrics_and_only_status_written(self):
+        result = self.run_intake(research=research_fixture(99999))
+        self.paid.assert_called_once()
         self.assertEqual(result["decisions"][0]["metrics"]["d4s"]["volume"], 0)
         for method, path, payload in self.writes():
             if path.startswith("pages/"):
                 self.assertEqual(set(payload["properties"]), {"Status"})
             self.assertNotIn("Owner", json.dumps(payload))
             self.assertNotIn("Approved for publishing", json.dumps(payload))
+
+    def test_dry_run_cached_metrics_do_not_remove_planned_research(self):
+        result = self.run_intake(dry_run=True, research=research_fixture())
+        self.assertEqual(len(result["planned_keyword_research_calls"]), 1)
+        self.paid.assert_not_called()
+        self.assertEqual(self.writes(), [])
+
+    def test_live_missing_metrics_do_not_fall_back_to_cache(self):
+        self.paid.return_value = subprocess.CompletedProcess([], 0, json.dumps(research_fixture(None)))
+        with self.assertRaises(ValueError):
+            self.run_intake(candidates=reviewed_fixture(self.page),
+                            research=research_fixture(99999), claim=PAGE_ID)
+        self.paid.assert_called_once()
+        self.assertEqual(self.writes(), [])
+
+    def test_failed_fresh_research_stops_even_with_cached_metrics(self):
+        self.paid.side_effect = subprocess.CalledProcessError(1, "synthetic command")
+        with self.assertRaisesRegex(ValueError, "keyword research failed"):
+            self.run_intake(research=research_fixture())
+        self.assertEqual(self.writes(), [])
+
+    def test_prior_day_serp_review_cannot_claim_draft(self):
+        candidates = reviewed_fixture(self.page)
+        candidates["topics"][0]["serp"]["reviewed_on"] = (TODAY - dt.timedelta(days=1)).isoformat()
+        result = self.run_intake(dry_run=True, candidates=candidates, research=research_fixture())
+        self.assertEqual(result["decisions"][0]["decision"], "research_needed")
+        self.assertTrue(any("SERP" in r for r in result["decisions"][0]["reasons"]))
+        self.assertIn("serp", result["candidates"]["topics"][0])
+        with self.assertRaises(ValueError):
+            self.run_intake(candidates=candidates, claim=PAGE_ID)
+        self.assertEqual(self.writes(), [])
 
     def test_human_owned_and_unknown_owner_skipped(self):
         for owner in ({"type": "people", "people": [{"id": "synthetic-human"}]},

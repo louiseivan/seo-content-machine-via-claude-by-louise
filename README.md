@@ -24,7 +24,7 @@ When separately configured, a scheduled Claude agent can check a Notion content 
 - **`linkback_sweep.py`** — new posts get internal links from topically-related older posts, with anti-spam caps (max 8 per new post, relevance-ranked, never inside anchors/headings).
 - **`keyword_research.py`** — merges Ahrefs and DataForSEO per keyword so volumes can be cross-checked; degrades gracefully when a provider is missing.
 - **`topic_selector.py`** — turns research and human buyer review into draft briefs, research-needed lists, existing-page updates, or rejects. Search volume never overrides failed product fit. See [the Claude topic skill](.claude/skills/ryder-buyer-seo/SKILL.md).
-- **`notion_topic_intake.py`** — pulls `Topic queued` pages from the Content Calendar, prefers `Blog`, skips human-owned pages, and runs keyword overview research and the existing selector. Decisions and drafts stay on the original Notion page; intake never grants publishing approval.
+- **`notion_topic_intake.py`** — pulls `Topic queued` pages from the Content Calendar, prefers `Blog`, skips human-owned pages, and runs fresh keyword overview research for every seed and the existing selector. A current-day Claude/human SERP inspection is required before drafting. Decisions and drafts stay on the original Notion page; intake never grants publishing approval.
 - **`gsc.py`** — Search Console service-account integration: performance queries, per-URL index inspection, sitemap submission. Paired with a daily scheduled task that watches new posts until Google indexes them, then disables itself.
 
 ## Layout
@@ -71,8 +71,14 @@ python3 ryder-shopify-autopilot/notion_topic_intake.py \
   --dry-run --output /tmp/ryder-topics.json
 ```
 
-The preview includes candidates, planned `keyword_research.py overview --json`
-calls (US/en), status writes, and skipped human-owned pages. Add
+Grok X Bot only supplies topic seeds and source context. It never fills search
+volume, keyword difficulty, SERP review, or `product_fit`; its keyword is an
+unverified seed. Research stays in this repo, and every live intake/review/claim
+runs `keyword_research.py overview --json` even when cached metrics exist.
+
+The preview includes candidates, planned keyword-research calls (US/en),
+required Claude/human SERP checks, status writes, and skipped human-owned
+pages. Add
 `--research-in-dry-run` only to explicitly allow provider calls during a
 preview. Run without `--dry-run` to perform research and write selector notes:
 
@@ -81,14 +87,19 @@ python3 ryder-shopify-autopilot/notion_topic_intake.py \
   --output /tmp/ryder-topics.json --research-output /tmp/ryder-keywords.json
 ```
 
-Missing product-fit/SERP reviews naturally yield `Research needed`; unknown
-volume stays null. Complete real reviews in the exported candidates using
+`--research PATH` can supply research to a dry-run preview; live runs always
+replace it with fresh provider output. Unknown volume stays null, even when
+older metrics were available. Inspect live US/English SERPs for each seed and
+record the query/result URL, intent notes, and today's `serp.reviewed_on` in
+the exported candidates. This is a Claude/human inspection, not a SERP API
+implemented here; keyword overview does not perform it. Missing product-fit
+or current-day SERP reviews block drafting. Complete real reviews using
 the [buyer skill](.claude/skills/ryder-buyer-seo/SKILL.md), preserving
 `notion_page_id`. To claim one reviewed `draft_brief` when writing begins:
 
 ```bash
 python3 ryder-shopify-autopilot/notion_topic_intake.py \
-  --candidates /tmp/ryder-topics.json --research /tmp/ryder-keywords.json \
+  --candidates /tmp/ryder-topics.json \
   --claim PAGE_ID
 ```
 

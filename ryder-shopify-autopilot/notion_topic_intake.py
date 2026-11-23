@@ -1,7 +1,9 @@
 """Pull queued Notion topics through the existing buyer selector, without publishing.
 
 Dry runs read Notion but never write it or call paid research unless explicitly
-requested. Exported candidates retain notion_page_id for review and drafting.
+requested. Every live run researches the queued keyword seeds in this repo;
+Grok supplies neither demand metrics nor product-fit/SERP verification.
+Exported candidates retain notion_page_id for review and drafting.
 """
 
 import argparse
@@ -91,21 +93,6 @@ def queued_pages():
 def research_command(topics):
     return [sys.executable, str(Path(__file__).with_name("keyword_research.py")),
             "overview", ",".join(t["keyword"] for t in topics), "--json"]
-
-
-def needs_research(topics, research, today):
-    if research is None:
-        return bool(topics)
-    select({"schema_version": 1, "topics": []}, research, today)  # validate input
-    try:
-        fresh = 0 <= (today - dt.date.fromisoformat(research.get("collected_on"))).days <= 120
-    except (ValueError, TypeError):
-        fresh = False
-    if not fresh or research.get("country") != "US" or research.get("language") != "en":
-        return bool(topics)
-    rows = {r["keyword"].strip().casefold(): r for r in research["rows"]}
-    return any(all(rows.get(t["keyword"].strip().casefold(), {}).get(p + "_volume") is None
-                   for p in ("d4s", "ahrefs")) for t in topics)
 
 
 def decision_note(result):
@@ -203,14 +190,17 @@ def run_intake(*, dry_run=False, research_in_dry_run=False, candidates=None,
     output = {"schema_version": 1, "topics": topics}
     if (candidates or {}).get("synthetic_example"):
         output["synthetic_example"] = True
-    planned_research = [research_command(topics)] if needs_research(topics, research, today) else []
+    planned_research = [research_command(topics)] if topics else []
     if planned_research and (not dry_run or research_in_dry_run):
         try:
             completed = subprocess.run(planned_research[0], capture_output=True, text=True, check=True)
             research = json.loads(completed.stdout)
         except (OSError, subprocess.CalledProcessError, ValueError):
             raise ValueError("keyword research failed; no Notion writes made") from None
-    selection = select(output, research, today)
+    # Keep old SERP notes in exports, but only today's actual inspection can pass.
+    selection_topics = [t if t.get("serp", {}).get("reviewed_on") == today.isoformat()
+                        else {**t, "serp": {}} for t in topics]
+    selection = select({**output, "topics": selection_topics}, research, today)
     if not dry_run and selection["synthetic_example"]:
         raise ValueError("synthetic research cannot change live Notion pages")
     by_keyword = {t["keyword"]: t for t in topics}
@@ -231,6 +221,8 @@ def run_intake(*, dry_run=False, research_in_dry_run=False, candidates=None,
             write_decision(plan["page_id"], result, plan["status"])
     return {"candidates": output, "research": research, "decisions": decisions,
             "planned_keyword_research_calls": planned_research,
+            "planned_serp_checks": [{"page_id": t["notion_page_id"], "keyword": t["keyword"],
+                                     "country": "US", "language": "en"} for t in topics],
             "planned_status_writes": plans, "skipped": skipped, "dry_run": dry_run}
 
 
@@ -241,7 +233,7 @@ def main():
     parser.add_argument("--output", type=Path, help="Write candidates JSON locally")
     parser.add_argument("--research-output", type=Path, help="Save provider JSON for subsequent review")
     parser.add_argument("--candidates", type=Path, help="Previously exported candidates with human/Claude reviews")
-    parser.add_argument("--research", type=Path, help="Reuse existing research JSON if volume is known and current")
+    parser.add_argument("--research", type=Path, help="Preview research JSON; live runs always replace it with fresh research")
     parser.add_argument("--claim", help="Claim one reviewed draft_brief page as Drafting")
     args = parser.parse_args()
     load_env(required_keys=("NOTION_API_KEY",))

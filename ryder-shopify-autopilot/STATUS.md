@@ -7,14 +7,22 @@ Last updated: 2026-11-24 (Notion topic intake and same-page draft handoff)
 - `notion_topic_intake.py` reads `Topic queued`, prefers `Blog`, skips
   human-owned pages, and fails closed on unknown ownership. It maps the
   existing properties without inventing product-fit or SERP reviews, runs
-  US/en keyword overview JSON for unknown volume, then the existing selector.
+  fresh US/en keyword overview JSON for every seed, then the existing selector.
+  Grok provides only topic seeds/context, never search volume, keyword
+  difficulty, SERP reviews or `product_fit`. Cached metrics do not skip live
+  research; `--research` is for dry-run previews only.
+- Every queued seed requires a live US/English SERP inspection by Claude/a
+  human, with the query/result URL, intent notes and today's `reviewed_on`.
+  Intake lists these checks and blocks drafting without a current-day review.
+  It does not fabricate reviews or implement a separate SERP API.
 - `--dry-run --output /tmp/ryder-topics.json` prints candidates, planned
   research and status writes. Dry-run never writes Notion and calls no paid
   providers unless `--research-in-dry-run` is explicitly supplied.
 - `research_needed` -> `Research needed`; `reject` -> Status `Archived`
   plus a note; `update_existing` -> `Research needed` plus a refresh/link
   note. No record is deleted and no duplicate article is started.
-- Reviewed exports can be passed back with `--candidates` and `--research`.
+- Reviewed exports can be passed back with `--candidates`; live runs repeat
+  keyword research, including when claiming a page.
   `--claim PAGE_ID` moves only a recomputed `draft_brief` to `Drafting` when
   Claude starts writing. Failed/missing reviews cannot claim a page.
 - A passing draft and sibling `.meta.json` go through

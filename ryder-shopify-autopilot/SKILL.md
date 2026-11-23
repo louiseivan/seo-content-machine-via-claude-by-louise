@@ -14,7 +14,10 @@ itself trusts its manifest and does not recheck that status.
 
 Daily drafts start with `notion_topic_intake.py` pulling `Topic queued`
 pages from the existing Content Calendar. Follow the buyer skill for research
-and review, explicitly claim a `draft_brief` as `Drafting`, and run the
+and review: Grok supplies unverified keyword seeds, never volume, difficulty,
+SERP reviews or `product_fit`. Always run the repository's keyword research
+and a live US/English SERP inspection for each queued seed. Record today's
+SERP review; only then explicitly claim a `draft_brief` as `Drafting` and run the
 editorial gate. `push_to_notion_idea.py --page-id PAGE_ID draft.md` then
 appends the draft and SEO callout to that same page and lands it at `Idea`.
 Keep `notion_page_id` in the draft metadata and the publishing manifest.
