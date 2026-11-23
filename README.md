@@ -24,6 +24,7 @@ When separately configured, a scheduled Claude agent can check a Notion content 
 - **`linkback_sweep.py`** — new posts get internal links from topically-related older posts, with anti-spam caps (max 8 per new post, relevance-ranked, never inside anchors/headings).
 - **`keyword_research.py`** — merges Ahrefs and DataForSEO per keyword so volumes can be cross-checked; degrades gracefully when a provider is missing.
 - **`topic_selector.py`** — turns research and human buyer review into draft briefs, research-needed lists, existing-page updates, or rejects. Search volume never overrides failed product fit. See [the Claude topic skill](.claude/skills/ryder-buyer-seo/SKILL.md).
+- **`notion_topic_intake.py`** — pulls `Topic queued` pages from the Content Calendar, prefers `Blog`, skips human-owned pages, and runs keyword overview research and the existing selector. Decisions and drafts stay on the original Notion page; intake never grants publishing approval.
 - **`gsc.py`** — Search Console service-account integration: performance queries, per-URL index inspection, sitemap submission. Paired with a daily scheduled task that watches new posts until Google indexes them, then disables itself.
 
 ## Layout
@@ -59,6 +60,65 @@ credentials. It incurs provider charges if configured. Nothing in this repo
 activates a Claude schedule. The publishing skill filters Notion pages with
 status `Approved for publishing`, while a direct `push_articles.py` call
 trusts its manifest and does not independently recheck that status.
+
+## Notion queue to draft
+
+With `NOTION_API_KEY` configured locally, preview the queue without Notion
+writes or paid research:
+
+```bash
+python3 ryder-shopify-autopilot/notion_topic_intake.py \
+  --dry-run --output /tmp/ryder-topics.json
+```
+
+The preview includes candidates, planned `keyword_research.py overview --json`
+calls (US/en), status writes, and skipped human-owned pages. Add
+`--research-in-dry-run` only to explicitly allow provider calls during a
+preview. Run without `--dry-run` to perform research and write selector notes:
+
+```bash
+python3 ryder-shopify-autopilot/notion_topic_intake.py \
+  --output /tmp/ryder-topics.json --research-output /tmp/ryder-keywords.json
+```
+
+Missing product-fit/SERP reviews naturally yield `Research needed`; unknown
+volume stays null. Complete real reviews in the exported candidates using
+the [buyer skill](.claude/skills/ryder-buyer-seo/SKILL.md), preserving
+`notion_page_id`. To claim one reviewed `draft_brief` when writing begins:
+
+```bash
+python3 ryder-shopify-autopilot/notion_topic_intake.py \
+  --candidates /tmp/ryder-topics.json --research /tmp/ryder-keywords.json \
+  --claim PAGE_ID
+```
+
+This recomputes the decision before setting `Drafting`. `update_existing`
+means refresh/link the existing URL and stays `Research needed`; `reject`
+gets Status `Archived` and a note, without deleting the record.
+
+After writing and checking the draft, update the original page:
+
+```bash
+python3 ryder-shopify-autopilot/prepublish_check.py /path/to/draft.md
+python3 ryder-shopify-autopilot/push_to_notion_idea.py \
+  /path/to/draft.md --page-id PAGE_ID
+```
+
+A sibling `draft.meta.json` is still required. Its `notion_page_id` can also
+select the existing page; conflicting IDs are rejected. The uploader enforces
+the editorial gate on the body and metadata, appends the draft/SEO callout,
+and sets `Idea` on that same unowned page. It preserves intake notes; reruns
+append revisions, so inspect partial failed uploads before retrying. Without
+a known ID, local drafts retain the create path. Keep that ID in the existing
+Shopify publishing manifest.
+
+Intake/drafting never sets `Approved for publishing`, writes `Owner`, touches
+`Post URL`/`Publish date`, or deletes records. Fresh ownership/status checks
+fail closed, but are not a transactional lock: use one worker per page.
+Keep credentials and real queue/research exports outside the public repo;
+only synthetic test fixtures are included. The API stays pinned to
+`2022-06-28`, querying `NOTION_DB_ID`; the collection ID is separately named
+`NOTION_DATA_SOURCE_ID`, not an invalid database ID.
 
 ## License
 

@@ -1,0 +1,30 @@
+{
+  "object": "page",
+  "id": "11111111-1111-4111-8111-111111111111",
+  "url": "https://www.notion.so/11111111111141118111111111111111",
+  "parent": {"type": "database_id", "database_id": "20a0b656-6cfd-8067-82de-eddd645ae75e"},
+  "archived": false,
+  "properties": {
+    "Content name": {"type": "title", "title": [{"plain_text": "Synthetic wallet topic"}]},
+    "Status": {"type": "status", "status": {"name": "Topic queued"}},
+    "Content type": {"type": "multi_select", "multi_select": [{"name": "Blog"}]},
+    "keyword": {"type": "rich_text", "rich_text": [{"text": {"content": "first hardware wallet"}}]},
+    "persona": {"type": "select", "select": {"name": "exchange_holder"}},
+    "buyer_intent": {"type": "select", "select": {"name": "decision"}},
+    "buyer_question": {"type": "rich_text", "rich_text": [{"plain_text": "How do I choose my first wallet?"}]},
+    "angle": {"type": "rich_text", "rich_text": [{"plain_text": "Purchase checks for a first wallet"}]},
+    "evidence": {"type": "rich_text", "rich_text": [
+      {"plain_text": "```json\n[{\"claim\":\"Synthetic claim, not factual evidence\",\"source\\_url\":\""},
+      {"plain_text": "[https://example.com/wallet\\_guide](https://example.com/wallet\\_guide)", "href": "https://example.com/wallet_guide"},
+      {"plain_text": "\",\"checked\\_on\":\"2026-11-24\"}]\n```"}
+    ]},
+    "existing_coverage_status": {"type": "select", "select": {"name": "none"}},
+    "existing_coverage_url": {"type": "url", "url": null},
+    "X source": {"type": "url", "url": "https://example.com/synthetic-post"},
+    "X likes": {"type": "number", "number": 42},
+    "Queued by": {"type": "select", "select": {"name": "Grok X Bot"}},
+    "Owner": {"type": "people", "people": []},
+    "Post URL": {"type": "url", "url": null},
+    "Publish date": {"type": "date", "date": null}
+  }
+}

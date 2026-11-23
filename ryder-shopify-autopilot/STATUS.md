@@ -1,6 +1,42 @@
 # ryder-shopify-autopilot — folder status
 
-Last updated: 2026-08-10 (pipeline rebuilt from scratch this session)
+Last updated: 2026-11-24 (Notion topic intake and same-page draft handoff)
+
+## Notion intake and draft handoff
+
+- `notion_topic_intake.py` reads `Topic queued`, prefers `Blog`, skips
+  human-owned pages, and fails closed on unknown ownership. It maps the
+  existing properties without inventing product-fit or SERP reviews, runs
+  US/en keyword overview JSON for unknown volume, then the existing selector.
+- `--dry-run --output /tmp/ryder-topics.json` prints candidates, planned
+  research and status writes. Dry-run never writes Notion and calls no paid
+  providers unless `--research-in-dry-run` is explicitly supplied.
+- `research_needed` -> `Research needed`; `reject` -> Status `Archived`
+  plus a note; `update_existing` -> `Research needed` plus a refresh/link
+  note. No record is deleted and no duplicate article is started.
+- Reviewed exports can be passed back with `--candidates` and `--research`.
+  `--claim PAGE_ID` moves only a recomputed `draft_brief` to `Drafting` when
+  Claude starts writing. Failed/missing reviews cannot claim a page.
+- A passing draft and sibling `.meta.json` go through
+  `push_to_notion_idea.py --page-id PAGE_ID draft.md` (or metadata
+  `notion_page_id`). It enforces `prepublish_check.py`, appends the body/SEO
+  callout without deleting notes, and sets `Idea` on the same page. Reruns
+  append revisions; inspect partial failed uploads before retrying. Existing
+  pages must still be unowned and in `Drafting`/`Idea`; local drafts without
+  a known page ID retain the create path.
+- Intake/drafting is hard-blocked from `Approved for publishing`. `Owner`
+  is never set or cleared; intake leaves `Post URL` and `Publish date` alone.
+  The existing publishing workflow remains separate and uses the same page ID.
+- Offline unittest coverage exercises mapping, evidence recovery, transitions,
+  ownership failures, dry-run, and same-page uploads. No live Notion/provider
+  smoke test or schedule activation was performed for this change.
+
+Schedule entries below describe historical, separately configured local
+tasks. This repository does not activate or verify any Claude schedule.
+Daily draft tasks should now start with the intake above and land `Idea`
+on the original queued page.
+
+## Historical pipeline notes
 
 The original Cowork scripts were lost; everything below is a local
 rebuild driven by CONTENT-MACHINE-SETUP.md and
@@ -35,7 +71,8 @@ RYDER_CONTENT_SYSTEM_PROMPT.md. Paths are localized for this machine
 - Notion: WORKING (connected 2026-08-10 via integration "SEO Automation
   by Louise"). Two corrections vs the setup guide: the real database is
   "Content Calendar" `20a0b656-6cfd-8067-82de-eddd645ae75e` (guide's ID
-  was a bad copy), and the trigger status option is exactly
+  is its data-source/collection ID `20a0b656-6cfd-8051-ac3e-000b9cbbd53f`,
+  not a bad database ID), and the trigger status option is exactly
   "Approved for publishing", not "Approved". Both fixed in common.py,
   SKILL.md, and the guide. 10 items sit in that status as of today, but
   several look like non-blog content (IG captions); review before any
@@ -69,10 +106,11 @@ RYDER_CONTENT_SYSTEM_PROMPT.md. Paths are localized for this machine
   pool went 244 -> 266 and a dry run went from 1 to 10 planned insertions.
 
 ## Daily drafts + toolchain notes (added 2026-08-13)
-- `ryder-daily-drafts` scheduled task added: 07:07 daily, ahead of the
-  hourly autopilot and the 09:35 index watch. Researches topics, drafts 3
-  articles, runs `prepublish_check.py`, then creates Notion cards via
-  `push_to_notion_idea.py` at Status "Idea". It is hard-blocked from
+- A separately configured `ryder-daily-drafts` task was recorded at 07:07
+  daily. Its current configuration is not verified here. Daily drafts should
+  now pull `Topic queued`, research/select, explicitly claim `Drafting`, run
+  `prepublish_check.py`, and update the same page via
+  `push_to_notion_idea.py` at Status "Idea". They are hard-blocked from
   setting "Approved for publishing": the human approval gate is what keeps
   unread drafts off Shopify.
 - `timeout`/`gtimeout` do not exist on this machine, so the documented

@@ -12,6 +12,19 @@ selector's `draft_brief` result never constitutes publishing approval.
 The scheduled-agent step below filters Notion status; `push_articles.py`
 itself trusts its manifest and does not recheck that status.
 
+Daily drafts start with `notion_topic_intake.py` pulling `Topic queued`
+pages from the existing Content Calendar. Follow the buyer skill for research
+and review, explicitly claim a `draft_brief` as `Drafting`, and run the
+editorial gate. `push_to_notion_idea.py --page-id PAGE_ID draft.md` then
+appends the draft and SEO callout to that same page and lands it at `Idea`.
+Keep `notion_page_id` in the draft metadata and the publishing manifest.
+Intake/drafting is hard-blocked from setting `Approved for publishing` or
+writing `Owner`; a selector result is never publishing approval.
+`update_existing` stays `Research needed` with a refresh/link note;
+`reject` gets Status `Archived` with a note, without deleting the page.
+This repository does not activate a Claude schedule; any schedule is
+configured separately.
+
 Runs unattended. All constants and credential handling live in
 `common.py`; credentials come from `CLAUDE OUTPUTS/Ryder One/shopify.env`
 and must never be echoed in output or logs.
@@ -73,11 +86,13 @@ and must never be echoed in output or logs.
   never go out as a launch. If art generation fails, the publish still
   proceeds (per step 4), but fix the art and rebuild the hero before
   announcing.
-- Never delete anything in Shopify or Notion (the API layer only allows
-  GET/POST/PUT).
+- Never delete anything in Shopify or Notion. Shopify's helper restricts
+  methods to GET/POST/PUT; Notion updates use PATCH without trashing records.
 - Tag is exactly `Industry Insights`; the scripts enforce this.
 - Do not change the status of any human-owned page. A page is
   human-owned if its Notion `Owner` people property has any value;
   autopilot only publishes pages with an empty `Owner`. Skip owned pages
   at manifest-build time and list them as "skipped: human-owned (<name>)".
+- Never set or clear `Owner`. Missing/malformed ownership data or a failed
+  lookup blocks the page too.
 - If Shopify auth fails, report it and stop; do not retry in a loop.

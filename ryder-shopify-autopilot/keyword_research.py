@@ -49,11 +49,10 @@ def _d4s_post(path, payload):
                         headers={"Authorization": f"Basic {token}"},
                         payload=[payload])
     if status != 200:
-        raise RuntimeError(f"dataforseo HTTP {status}: {str(body)[:200]}")
+        raise RuntimeError(f"dataforseo HTTP {status}")
     task = (body.get("tasks") or [{}])[0]
     if task.get("status_code") != 20000:
-        raise RuntimeError(f"dataforseo task {task.get('status_code')} "
-                           f"{task.get('status_message')}")
+        raise RuntimeError(f"dataforseo task {task.get('status_code')}")
     return (task.get("result") or [{}])[0].get("items") or []
 
 
@@ -101,7 +100,7 @@ def _ahrefs_get(path, params):
         "Authorization": f"Bearer {os.environ['AHREFS_API_KEY']}",
         "Accept": "application/json"})
     if status != 200:
-        raise RuntimeError(f"ahrefs HTTP {status}: {str(body)[:200]}")
+        raise RuntimeError(f"ahrefs HTTP {status}")
     rows = body.get("keywords") or body.get("terms") or []
     return {r["keyword"]: {"volume": r.get("volume"),
                            "difficulty": r.get("difficulty")}

@@ -13,6 +13,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from uuid import UUID
 
 # ---------------------------------------------------------------- paths
 
@@ -39,11 +40,17 @@ SHOPIFY_API_VERSION = "2024-10"
 ARTICLE_URL_PATTERN = "https://ryder.id/blogs/post/{handle}"
 ARTICLE_TAG = "Industry Insights"  # exactly this, one tag, never variations
 
-# Content Calendar. The setup guide's old ID (...8051-ac3e-000b9cbbd53f)
-# was a bad copy and 404s; verified against the live workspace 2026-08-10.
+# Content Calendar database and its data source (collection) are distinct IDs.
+# Keep the database endpoint with the pinned 2022-06-28 API used by this repo.
 NOTION_DB_ID = "20a0b656-6cfd-8067-82de-eddd645ae75e"
+NOTION_DATA_SOURCE_ID = "20a0b656-6cfd-8051-ac3e-000b9cbbd53f"
 NOTION_STATUS_APPROVED = "Approved for publishing"  # not plain "Approved"
 NOTION_STATUS_PUBLISHED = "Published"
+NOTION_STATUS_QUEUED = "Topic queued"
+NOTION_STATUS_RESEARCH = "Research needed"
+NOTION_STATUS_DRAFTING = "Drafting"
+NOTION_STATUS_IDEA = "Idea"
+NOTION_STATUS_ARCHIVED = "Archived"
 NOTION_VERSION = "2022-06-28"
 
 SLACK_CHANNEL_ID = "C0B2ARN0Y01"  # #ws-blogs-published
@@ -145,25 +152,51 @@ def notion(method, path, payload=None):
                 }, payload=payload)
 
 
-def notion_page_owners(page_id):
+def notion_page_owners(page_id, page=None):
     """Names on the page's `Owner` people property.
 
     Returns (True, [names]) on a clean lookup, or (False, reason) if the
     lookup itself failed. Callers must fail closed on (False, ...): an
     unverifiable page is treated as owned, never as unowned.
     """
-    status, body = notion("GET", f"pages/{page_id}")
-    if status != 200 or not isinstance(body, dict):
-        return False, f"notion HTTP {status}"
-    props = body.get("properties", {})
-    prop = props.get("Owner")
-    if not isinstance(prop, dict) or prop.get("type") != "people":
-        prop = next((p for p in props.values()
-                     if isinstance(p, dict) and p.get("type") == "people"), None)
-    if prop is None:
-        return True, []
+    if page is None:
+        try:
+            status, page = notion("GET", f"pages/{UUID(page_id)}")
+        except (OSError, ValueError):
+            return False, "owner lookup failed"
+        if status != 200:
+            return False, f"notion HTTP {status}"
+    props = page.get("properties") if isinstance(page, dict) else None
+    prop = props.get("Owner") if isinstance(props, dict) else None
+    if (not isinstance(prop, dict) or prop.get("type") != "people"
+            or not isinstance(prop.get("people"), list)):
+        return False, "Owner people property missing or invalid"
     return True, [p.get("name") or p.get("id", "unknown")
-                  for p in prop.get("people", [])]
+                  if isinstance(p, dict) else "unknown" for p in prop["people"]]
+
+
+def notion_writable_page(page_id, allowed_statuses):
+    """Fresh read before draft/intake writes; fail closed outside this calendar."""
+    page_id = str(UUID(page_id))
+    status, page = notion("GET", f"pages/{page_id}")
+    if status != 200 or not isinstance(page, dict):
+        raise ValueError(f"page lookup failed (HTTP {status})")
+    ok, owners = notion_page_owners(page_id, page=page)
+    if not ok:
+        raise ValueError("owner lookup failed")
+    if owners:
+        raise ValueError("human-owned")
+    parent = page.get("parent", {})
+    parent_id = parent.get("database_id") or parent.get("data_source_id")
+    expected = NOTION_DB_ID if "database_id" in parent else NOTION_DATA_SOURCE_ID
+    if not parent_id or UUID(parent_id) != UUID(expected):
+        raise ValueError("page is outside Content Calendar")
+    if page.get("archived") or page.get("in_trash"):
+        raise ValueError("page is archived or in trash")
+    current = (page.get("properties", {}).get("Status", {}).get("status") or {}).get("name")
+    if current not in allowed_statuses:
+        raise ValueError("page status is outside this workflow stage")
+    return page
 
 
 def notion_mark_published(page_id, live_url):

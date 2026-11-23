@@ -14,6 +14,17 @@ import common
 
 
 class ResearchJsonTests(unittest.TestCase):
+    def test_provider_failures_do_not_echo_response_bodies(self):
+        with patch.object(keyword_research, "http", return_value=(401, {"error": "sensitive response"})), \
+             patch.dict(os.environ, {"AHREFS_API_KEY": "synthetic-placeholder",
+                                     "DATAFORSEO_LOGIN": "synthetic-placeholder",
+                                     "DATAFORSEO_PASSWORD": "synthetic-placeholder"}):
+            for call in (lambda: keyword_research._ahrefs("overview", ["test wallet"], 1),
+                         lambda: keyword_research._d4s("overview", ["test wallet"], 1)):
+                with self.assertRaises(RuntimeError) as error:
+                    call()
+                self.assertNotIn("sensitive", str(error.exception))
+
     def test_optional_research_env_but_publisher_still_requires_credentials(self):
         with patch.dict(os.environ, {}, clear=True):
             common.load_env(path="/path/that/does/not/exist", required_keys=())
