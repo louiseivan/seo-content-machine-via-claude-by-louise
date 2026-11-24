@@ -1,21 +1,151 @@
-# SEO Content Machine via Claude by Louise
+# Ryder SEO content machine
 
-An automated SEO blog pipeline built in one day with [Claude Code](https://claude.com/claude-code), running in production at [ryder.id](https://ryder.id) (Ryder makes the Ryder One hardware wallet). Published here so other teams can borrow the architecture.
+A buyer-led SEO workflow for [Ryder](https://ryder.id), makers of the Ryder One
+hardware wallet. Grok bots discover stories and queue topic seeds in Notion;
+Claude researches and drafts; Louise approves; the Shopify autopilot publishes.
+The Content Calendar is the system of record, with one page retained from
+queued topic through publication.
 
-## What it does
+Repository: [louiseivan/seo-content-machine-via-claude-by-louise](https://github.com/louiseivan/seo-content-machine-via-claude-by-louise).
+
+## New flow from November 24, 2026
+
+All scheduled slots below are **weekdays in Asia/Tokyo**. These are the
+operating schedule and responsibilities; schedules and Grok bots are configured
+outside this repository. Cloning or updating the repo does not activate them.
+
+| Who | When (Asia/Tokyo) | Responsibility |
+| --- | --- | --- |
+| Wallet Security Watch (Grok bot) | About 06:00 / 11:30 / 17:30 | Find competitor wallet news, hacks, and phone/OS flaws; send findings to News Hi-jack X Bot. |
+| News Hi-jack X Bot (Grok bot) | 06:30 / 12:00 / 18:00 | Scan X trends in crypto, AI, finance, and prediction markets alongside the watcher's findings; send Louise a digest and queue stories with an honest wallet-buyer question in Notion. |
+| Ryder Fact-Check (Grok bot) | On request | Verify claims and check ryder.id for existing coverage. Claude still re-verifies sources before drafting. |
+| Claude | 06:45 / 12:15 / 18:15 | Run SEO research, decide buyer fit, and draft up to two eligible topics per slot. |
+| Louise | After reviewing an Idea | Approve publishing. |
+| Shopify autopilot (this repo) | After Louise's approval | Publish approved pages using the existing publishing workflow. |
+| Measurement | Weekly check-in on Mondays | Review Google Search Console, Ahrefs, and index watch against the November 24 baseline; final review around December 15, 2026. |
 
 ```
-keyword research ──► buyer topic selection ──► drafting ──► editorial gate
-      │                                                      │
-   Ahrefs /                                                  ▼
-  DataForSEO                                    brand cover generation (Figma tokens)
-      │                                                      │
-      ▼                                                      ▼
-Google Search Console ◄── link-back sweep ◄── Shopify publish ──► Notion + Slack
- (sitemap + index watch)
+Wallet Security Watch ──► News Hi-jack X Bot ◄── X trends
+                                   │
+                                   ▼
+                          Notion: Topic queued
+                                   │
+                                   ▼
+                      Claude: SEO + SERP + buyer-fit review
+                                   │
+                ┌──────────────────┼───────────────────┐
+                ▼                  ▼                   ▼
+         Research needed        Archived            Drafting
+                                                       │
+                                            verify claims + draft + gate
+                                                       ▼
+                                                      Idea
+                                                       │
+                                                Louise approves
+                                                       ▼
+                                            Approved for publishing
+                                                       │
+                                             Shopify autopilot publishes
+                                                       ▼
+                                     Published ──► index watch + measurement
 ```
 
-When separately configured, a scheduled Claude agent can check a Notion content calendar for approved articles and ship them end to end: editorial gate, cover image, Shopify article with SEO metafields, Notion status update with the live URL, Slack announcement, internal link-backs from older posts, and a sitemap resubmission to Google.
+## Content Calendar
+
+- Database: `20a0b656-6cfd-8067-82de-eddd645ae75e` (`NOTION_DB_ID`).
+- Data source: `collection://20a0b656-6cfd-8051-ac3e-000b9cbbd53f`.
+- Status flow: `Topic queued` → `Research needed` / `Drafting` → `Idea` →
+  `Approved for publishing` → `Published`, or `Archived` for rejected topics.
+
+Grok fills these existing fields:
+
+| Field | Queued content |
+| --- | --- |
+| `Content name` | Story/topic title |
+| `Status` | `Topic queued` |
+| `Content type` | Includes `Blog` |
+| `keyword` | Seed only, never verified demand |
+| `persona`, `buyer_intent`, `buyer_question`, `angle` | Proposed reader, intent, honest wallet-buyer question, and angle |
+| `evidence` | JSON array of `{claim, source_url, checked_on}` |
+| `existing_coverage_status`, `existing_coverage_url` | Only when coverage has been checked |
+| `X source`, `X likes` | Source context; likes are not search demand |
+| `Queued by` | `Grok X Bot` |
+
+The page body contains **Claims to check**. Bot-created pages leave `Owner`
+empty; automation must never set or clear it. Skip human-owned pages and fail
+closed when ownership cannot be verified. Grok never fills search volume,
+keyword difficulty, SERP review, or `product_fit`.
+
+## Claude's run at each slot
+
+1. Pull `Topic queued` pages with empty `Owner`. Select **at most two per
+   run, oldest first by creation time**; skip anything already `Drafting` or
+   `Idea`. Keep the original page IDs. The caller must enforce this selection
+   before live intake; see the implementation notes below.
+2. Treat each keyword as a seed. Always run `keyword_research.py` for US/en
+   volume and difficulty, inspect live Google results, and judge product fit
+   honestly. Audience overlap alone does not establish product fit. Record
+   today's SERP inspection and actual product-fit review; never invent them.
+3. Run `topic_selector.py` and write the decision and reasons to the **same page**:
+   - `research_needed` → `Research needed` plus a note.
+   - `update_existing` → `Research needed` plus a note to refresh or link
+     `existing_coverage_url`; do not draft a duplicate article.
+   - `reject` → Status `Archived` plus a note; do not delete the page.
+   - `draft_brief` → explicitly claim `Drafting`, then begin writing.
+4. Re-verify every claim in `evidence` and **Claims to check** against original
+   sources. Drop or soften anything unverified. Never invent numbers, quotes,
+   or sources. A Grok fact-check is context, not a substitute for this step.
+5. Draft with the [ryder-buyer-seo skill](.claude/skills/ryder-buyer-seo/SKILL.md):
+   answer `buyer_question` first, use the trend as the hook, and mention Ryder
+   only where it genuinely answers the question.
+6. Pass `prepublish_check.py`, then use `push_to_notion_idea.py` to put the
+   draft on the **same page** at `Idea`. Preserve `notion_page_id` in the
+   sibling `.meta.json`; never create a duplicate page for a queued topic.
+7. Log pages processed, the decision for each, and why. Intake returns the
+   decision report and writes notes to the original pages; retain run reports
+   locally, outside this public repository.
+
+## Approval and publishing rules
+
+- Claude's intake/drafting run must never set `Approved for publishing`,
+  fill or clear `Owner`, or publish. A selector result is not approval.
+- Louise approves. The separate [Shopify autopilot](ryder-shopify-autopilot/SKILL.md)
+  publishes approved pages. The required handoff is `Published`, `Post URL`,
+  and `Publish date` on the original Notion page; see the current date-write
+  gap below. Intake must not touch either publishing field.
+- Log each new article URL for index watch and the weekly check-in. The
+  publisher records live URLs in its results and adds successful new article
+  slugs to `index_watch.py`; carry those URLs into the weekly review.
+- Never delete Notion or Shopify records, and never commit credentials.
+
+### Current implementation limits
+
+The intake CLI prefers Blog pages but currently has no two-page limit or
+oldest-first sort. The scheduled caller must select the oldest two eligible
+pages before passing a restricted `--candidates` file to live intake.
+Do not run unrestricted live intake for a two-topic slot.
+
+The publishing helper currently writes `Published` and `Post URL`, but does
+**not yet write `Publish date`**. That write remains required to complete the
+new publishing handoff. The publishing skill filters approval status; a
+direct `push_articles.py` call trusts its manifest and does not independently
+recheck approval. No schedule is installed by this repository.
+
+## Measurement baseline
+
+Use **2026-11-24** as the comparison baseline for Monday check-ins, with a
+final review around **2026-12-15**. These are recorded historical snapshots,
+not live metrics.
+
+| Source / snapshot | Metric | Baseline |
+| --- | --- | ---: |
+| GSC `sc-domain:ryder.id`, 28 days ending 2026-11-21 | Clicks | 1,301 |
+| Same GSC window | Impressions | 154,298 |
+| Same GSC window | Average position | 6.94 |
+| Index watch at baseline | Newest posts indexed | 10 / 10 |
+| Ahrefs, 2026-11-23 | Domain Rating (DR) | 43 |
+| Ahrefs, 2026-11-23 | Referring domains | 1,229 |
+| Ahrefs, 2026-11-23 | Organic keywords | 145 |
 
 ## The interesting parts
 
@@ -80,11 +210,15 @@ The preview includes candidates, planned keyword-research calls (US/en),
 required Claude/human SERP checks, status writes, and skipped human-owned
 pages. Add
 `--research-in-dry-run` only to explicitly allow provider calls during a
-preview. Run without `--dry-run` to perform research and write selector notes:
+preview. For a weekday slot, use Notion's creation timestamps to select the
+oldest two eligible pages from the preview and save only those topics in
+`/tmp/ryder-slot.json`, preserving `schema_version: 1` and `notion_page_id`.
+Run live intake against that restricted file to research and write notes:
 
 ```bash
 python3 ryder-shopify-autopilot/notion_topic_intake.py \
-  --output /tmp/ryder-topics.json --research-output /tmp/ryder-keywords.json
+  --candidates /tmp/ryder-slot.json --output /tmp/ryder-slot.json \
+  --research-output /tmp/ryder-keywords.json
 ```
 
 `--research PATH` can supply research to a dry-run preview; live runs always
@@ -99,7 +233,7 @@ the [buyer skill](.claude/skills/ryder-buyer-seo/SKILL.md), preserving
 
 ```bash
 python3 ryder-shopify-autopilot/notion_topic_intake.py \
-  --candidates /tmp/ryder-topics.json \
+  --candidates /tmp/ryder-slot.json \
   --claim PAGE_ID
 ```
 
