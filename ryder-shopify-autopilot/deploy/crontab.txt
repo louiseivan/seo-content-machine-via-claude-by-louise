@@ -1,0 +1,18 @@
+# Ryder SEO pipeline. The server clock is set to Asia/Tokyo by setup.sh,
+# so these times are Tokyo time. Install with: crontab deploy/crontab.txt
+SHELL=/bin/bash
+R=/home/ryder/CodingStudio/ryder-shopify-autopilot/deploy/run-task.sh
+
+# Drafter: weekdays, 15 minutes after News Hi-jack X Bot queues topics.
+45 6 * * 1-5   $R drafter
+15 12 * * 1-5  $R drafter
+15 18 * * 1-5  $R drafter
+
+# Publisher: every day, about an hour after each drafter slot.
+45 7 * * *     $R autopilot
+45 13 * * *    $R autopilot
+45 19 * * *    $R autopilot
+
+# Index watch: every night at midnight, checks Google coverage for every
+# pending post and re-submits the sitemap while anything is unindexed.
+0 0 * * *      $R index-watch

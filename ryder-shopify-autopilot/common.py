@@ -199,11 +199,15 @@ def notion_writable_page(page_id, allowed_statuses):
     return page
 
 
-def notion_mark_published(page_id, live_url):
+def notion_mark_published(page_id, live_url, publish_date=None):
+    """Complete the handoff: Published + Post URL + Publish date (local date)."""
+    import datetime
+    publish_date = publish_date or datetime.date.today().isoformat()
     status, body = notion("PATCH", f"pages/{page_id}", {
         "properties": {
             "Status": {"status": {"name": "Published"}},
             "Post URL": {"url": live_url},
+            "Publish date": {"date": {"start": publish_date}},
         }})
     return status == 200, body if status != 200 else None
 

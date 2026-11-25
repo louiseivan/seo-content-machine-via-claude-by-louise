@@ -216,13 +216,34 @@ def main():
     results = load_results()
     done = {r["slug"] for r in results if r.get("ok")}
 
+    # Daily publish cap + index brake (publish_budget.py). Enforced here so
+    # the pace holds however the manifest was built. Articles over the cap
+    # are deferred: settled for this run, retried on the next one.
+    from publish_budget import budget as publish_budget, record_publish
+    allowance = publish_budget()
+    print(f"publish budget: {allowance['remaining_today']} left today "
+          f"({allowance['reason']})")
+    left = allowance["remaining_today"]
+
     for item in manifest:
         if item["slug"] in done:
             continue
         if budget and time.time() - started > budget:
             print(f"budget reached ({budget}s); run again to continue")
             break
+        if left <= 0 and not dry_run and not article_exists(item["slug"]):
+            outcome = {"slug": item["slug"], "ok": False, "terminal": True,
+                       "deferred": True,
+                       "error": "deferred: daily publish cap reached "
+                                f"({allowance['reason']}); stays approved for a later run"}
+            results = [r for r in results if r["slug"] != item["slug"]] + [outcome]
+            save_results(results)
+            print(f"DEF {item['slug']} -> {outcome['error']}")
+            continue
         outcome = push_one(item, dry_run=dry_run)
+        if outcome.get("ok") and not outcome.get("dedup_skip") and not dry_run:
+            record_publish(item["slug"], item.get("title", ""))
+            left -= 1
         results = [r for r in results if r["slug"] != item["slug"]] + [outcome]
         save_results(results)
         # Enter the index watch at push time, not at check time. The manifest

@@ -6,9 +6,12 @@ description: Publish approved Ryder blog articles from Notion to Shopify automat
 # Ryder Shopify Autopilot
 
 For new article ideas or drafts, first use
-`.claude/skills/ryder-buyer-seo/SKILL.md`. This skill starts only after a
-human has set the Notion page status to `Approved for publishing`. The
-selector's `draft_brief` result never constitutes publishing approval.
+`.claude/skills/ryder-buyer-seo/SKILL.md`. This skill starts once a page's
+Notion status is `Approved for publishing`, set either by Louise or by the
+scheduled drafter's auto-approval. A selector `draft_brief` alone is not
+approval; a finished, gate-passing draft is.
+
+Auto-approval (Louise, 2026-11-24): the scheduled drafter approves its own finished drafts by setting `Approved for publishing` after they pass the editorial gate and its source checks, and stamps the page's internal review notes with "Auto-approved by ryder-article-drafter". The autopilot publishes those pages exactly like human-approved ones; never skip a page because automation approved it.
 The scheduled-agent step below filters Notion status; `push_articles.py`
 itself trusts its manifest and does not recheck that status.
 
@@ -21,8 +24,8 @@ SERP review; only then explicitly claim a `draft_brief` as `Drafting` and run th
 editorial gate. `push_to_notion_idea.py --page-id PAGE_ID draft.md` then
 appends the draft and SEO callout to that same page and lands it at `Idea`.
 Keep `notion_page_id` in the draft metadata and the publishing manifest.
-Intake/drafting is hard-blocked from setting `Approved for publishing` or
-writing `Owner`; a selector result is never publishing approval.
+After the draft lands at `Idea`, the drafter sets `Approved for publishing`
+itself (auto-approval). It never writes or clears `Owner`.
 `update_existing` stays `Research needed` with a refresh/link note;
 `reject` gets Status `Archived` with a note, without deleting the page.
 This repository does not activate a Claude schedule; any schedule is
@@ -48,18 +51,26 @@ and must never be echoed in output or logs.
    title, seo_title, meta_description, hero_alt, target_keyword,
    blog_categories_raw = ["Industry Insights"], content_angle).
 4. Topic artwork (branding guideline, see visual-system.md): for each
-   article missing `assets/brand/art/<slug>.png`, generate an engraving
-   with vidiq_generate_thumbnail using the house prompt from
-   visual-system.md, filling `<subject>` with a concrete object that
-   stands for the article's topic (from `art_subject` in the manifest if
-   present, else choose one). Poll vidiq_job_poll, download the PNG to
-   `assets/brand/art/<slug>.png`. If generation fails, continue with the
-   fallback gravure art rather than blocking the publish; note it in the
-   summary. Never let generated art contain text, faces, or logos: if it
-   does, regenerate once, then fall back.
+   article missing `assets/brand/art/<slug>.png`, pick ONE concrete object
+   that stands for the topic (`art_subject` in the manifest if present;
+   dice for randomness, vault door for cold storage, shipping box for a
+   shipping leak) and describe it so it reads TALLER than wide, then run
+   `python3 gemini_art.py <slug> "<subject>"`. It uses the house prompt,
+   Google Gemini (GEMINI_API_KEY in shopify.env, gemini-3-pro-image first),
+   a second model's check for text, faces, logos and a white ground, and
+   one retry. Open the PNG: if the object is a thin sliver (width_to_height
+   under about 0.5) or reads wrong, rerun once with a fuller, more compact
+   description. Never use vidIQ.
+   Backup only if gemini_art.py exits non-zero (credit, quota or outage):
+   draw the art with `engrave_art.py` from an SVG of simple toned shapes
+   (see that file's docstring; keep the drawing no wider than ~0.8x its
+   height), and say in the summary that the cover used the backup.
+   For an article already live without good art, add the art and run
+   `python3 refresh_hero.py <slug>` (it swaps the Shopify cover and posts
+   the held-back Slack announcement; `--no-announce` if one already went out).
 5. Run the push in budget slices until complete:
    ```bash
-   cd /Users/l/CodingStudio/ryder-shopify-autopilot
+   cd ryder-shopify-autopilot   # from the repository root
    REGEN_BUDGET_S=38 perl -e 'alarm 41; exec @ARGV' python3 push_articles.py
    ```
    macOS has no `timeout`/`gtimeout` binary, so the perl alarm stands in

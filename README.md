@@ -2,7 +2,7 @@
 
 A buyer-led SEO workflow for [Ryder](https://ryder.id), makers of the Ryder One
 hardware wallet. Grok bots discover stories and queue topic seeds in Notion;
-Claude researches and drafts; Louise approves; the Shopify autopilot publishes.
+Claude researches, drafts and auto-approves; the Shopify autopilot publishes.
 The Content Calendar is the system of record, with one page retained from
 queued topic through publication.
 
@@ -19,9 +19,9 @@ outside this repository. Cloning or updating the repo does not activate them.
 | Wallet Security Watch (Grok bot) | About 06:00 / 11:30 / 17:30 | Find competitor wallet news, hacks, and phone/OS flaws; send findings to News Hi-jack X Bot. |
 | News Hi-jack X Bot (Grok bot) | 06:30 / 12:00 / 18:00 | Scan X trends in crypto, AI, finance, and prediction markets alongside the watcher's findings; send Louise a digest and queue stories with an honest wallet-buyer question in Notion. |
 | Ryder Fact-Check (Grok bot) | On request | Verify claims and check ryder.id for existing coverage. Claude still re-verifies sources before drafting. |
-| Claude | 06:45 / 12:15 / 18:15 | Run SEO research, decide buyer fit, and draft up to two eligible topics per slot. |
-| Louise | After reviewing an Idea | Approve publishing. |
-| Shopify autopilot (this repo) | After Louise's approval | Publish approved pages using the existing publishing workflow. |
+| Claude | 06:45 / 12:15 / 18:15 | Run SEO research, decide buyer fit, draft up to four eligible topics per slot, and auto-approve finished drafts. |
+| Louise | Any time | Spot-check published articles; approve or fix anything the drafter left at Idea. |
+| Shopify autopilot (this repo) | 07:45 / 13:45 / 19:45 daily | Publish approved pages using the existing publishing workflow. |
 | Measurement | Weekly check-in on Mondays | Review Google Search Console, Ahrefs, and index watch against the November 24 baseline; final review around December 15, 2026. |
 
 ```
@@ -41,7 +41,7 @@ Wallet Security Watch ──► News Hi-jack X Bot ◄── X trends
                                                        ▼
                                                       Idea
                                                        │
-                                                Louise approves
+                                     Claude auto-approves
                                                        ▼
                                             Approved for publishing
                                                        │
@@ -78,7 +78,7 @@ keyword difficulty, SERP review, or `product_fit`.
 
 ## Claude's run at each slot
 
-1. Pull `Topic queued` pages with empty `Owner`. Select **at most two per
+1. Pull `Topic queued` pages with empty `Owner`. Select **at most four per
    run, oldest first by creation time**; skip anything already `Drafting` or
    `Idea`. Keep the original page IDs. The caller must enforce this selection
    before live intake; see the implementation notes below.
@@ -107,9 +107,10 @@ keyword difficulty, SERP review, or `product_fit`.
 
 ## Approval and publishing rules
 
-- Claude's intake/drafting run must never set `Approved for publishing`,
-  fill or clear `Owner`, or publish. A selector result is not approval.
-- Louise approves. The separate [Shopify autopilot](ryder-shopify-autopilot/SKILL.md)
+- Auto-approval (Louise, 2026-11-24): the scheduled drafter approves its own finished drafts by setting `Approved for publishing` after they pass the editorial gate and its source checks, and stamps the page's internal review notes with "Auto-approved by ryder-article-drafter". The autopilot publishes those pages exactly like human-approved ones; never skip a page because automation approved it.
+  The drafter never fills or clears `Owner` and never publishes; a selector
+  result alone is not approval.
+- The separate [Shopify autopilot](ryder-shopify-autopilot/SKILL.md)
   publishes approved pages. The required handoff is `Published`, `Post URL`,
   and `Publish date` on the original Notion page; see the current date-write
   gap below. Intake must not touch either publishing field.
@@ -121,7 +122,7 @@ keyword difficulty, SERP review, or `product_fit`.
 ### Current implementation limits
 
 The intake CLI prefers Blog pages but currently has no two-page limit or
-oldest-first sort. The scheduled caller must select the oldest two eligible
+oldest-first sort. The scheduled caller must select the oldest four eligible
 pages before passing a restricted `--candidates` file to live intake.
 Do not run unrestricted live intake for a two-topic slot.
 
@@ -211,7 +212,7 @@ required Claude/human SERP checks, status writes, and skipped human-owned
 pages. Add
 `--research-in-dry-run` only to explicitly allow provider calls during a
 preview. For a weekday slot, use Notion's creation timestamps to select the
-oldest two eligible pages from the preview and save only those topics in
+oldest four eligible pages from the preview and save only those topics in
 `/tmp/ryder-slot.json`, preserving `schema_version: 1` and `notion_page_id`.
 Run live intake against that restricted file to research and write notes:
 
@@ -257,7 +258,7 @@ append revisions, so inspect partial failed uploads before retrying. Without
 a known ID, local drafts retain the create path. Keep that ID in the existing
 Shopify publishing manifest.
 
-Intake/drafting never sets `Approved for publishing`, writes `Owner`, touches
+Intake (the scripts) never sets `Approved for publishing`; the scheduled drafter does that after the gate. Nothing writes `Owner` or touches
 `Post URL`/`Publish date`, or deletes records. Fresh ownership/status checks
 fail closed, but are not a transactional lock: use one worker per page.
 Keep credentials and real queue/research exports outside the public repo;

@@ -36,6 +36,43 @@ class TopicSelectorTests(unittest.TestCase):
         self.assertEqual(buyer["brief"]["buyer_question"],
                          self.candidates["topics"][0]["buyer_question"])
 
+    def _news_topic(self, event_date, source="https://example.com/primary"):
+        topic = copy.deepcopy(self.candidates["topics"][0])
+        topic["keyword"] = "example wallet breach"
+        topic["news"] = {"event_date": event_date, "primary_source_url": source}
+        self.candidates["topics"] = [topic]
+        return topic
+
+    def test_fresh_news_drafts_without_volume(self):
+        self._news_topic((TODAY - dt.timedelta(days=3)).isoformat())
+        item = self.decisions()["example wallet breach"]
+        self.assertEqual(item["decision"], "draft_brief")
+        self.assertTrue(any("fresh news" in n for n in item["notes"]))
+
+    def test_stale_news_still_needs_volume(self):
+        self._news_topic((TODAY - dt.timedelta(days=30)).isoformat())
+        item = self.decisions()["example wallet breach"]
+        self.assertEqual(item["decision"], "research_needed")
+        self.assertIn("keyword metrics missing from research", item["reasons"])
+
+    def test_news_without_primary_source_needs_volume(self):
+        self._news_topic(TODAY.isoformat(), source="not a url")
+        item = self.decisions()["example wallet breach"]
+        self.assertEqual(item["decision"], "research_needed")
+
+    def test_fresh_news_keeps_other_gates(self):
+        topic = self._news_topic(TODAY.isoformat())
+        topic["serp"]["reviewed_on"] = None
+        item = self.decisions()["example wallet breach"]
+        self.assertEqual(item["decision"], "research_needed")
+        self.assertIn("US SERP intent needs dated review with source and notes",
+                      item["reasons"])
+
+    def test_future_news_date_is_not_fresh(self):
+        self._news_topic((TODAY + dt.timedelta(days=2)).isoformat())
+        self.assertEqual(self.decisions()["example wallet breach"]["decision"],
+                         "research_needed")
+
     def test_existing_coverage_routes_to_update_and_zero_is_observed(self):
         item = self.decisions()["how to set up a hardware wallet"]
         self.assertEqual(item["decision"], "update_existing")
