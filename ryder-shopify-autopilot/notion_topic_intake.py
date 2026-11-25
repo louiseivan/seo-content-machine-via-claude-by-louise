@@ -172,7 +172,7 @@ def run_intake(*, dry_run=False, research_in_dry_run=False, candidates=None,
                 if topic["existing_coverage"].get("status") == "existing" and any(
                         coverage.get(k) != topic["existing_coverage"].get(k) for k in ("status", "url")):
                     raise ValueError("live existing coverage must be retained in the review")
-                for key in ("product_fit", "serp", "existing_coverage", "evidence", "reader", "buyer_question", "angle"):
+                for key in ("product_fit", "serp", "existing_coverage", "evidence", "reader", "buyer_question", "angle", "news"):
                     if key in previous:
                         topic[key] = previous[key]
             key = topic["keyword"].strip().casefold()

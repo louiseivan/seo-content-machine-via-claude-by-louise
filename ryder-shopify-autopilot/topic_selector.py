@@ -35,6 +35,16 @@ def _recent(value, today, days=120):
     return day is not None and 0 <= (today - day).days <= days
 
 
+NEWS_WINDOW_DAYS = 14
+
+
+def _fresh_news(news, today):
+    """A dated event within NEWS_WINDOW_DAYS with a primary source URL."""
+    return (isinstance(news, dict)
+            and _recent(news.get("event_date"), today, NEWS_WINDOW_DAYS)
+            and _web_url(news.get("primary_source_url")))
+
+
 def _nonempty(value):
     return isinstance(value, str) and bool(value.strip())
 
@@ -117,6 +127,7 @@ def select(candidates, research=None, today=None):
             or persona not in PERSONAS or intent not in INTENTS):
             raise ValueError("invalid persona or buyer_intent for " + keyword)
         reasons = []
+        notes = []
         coverage = topic.get("existing_coverage", {})
         fit = topic.get("product_fit", {})
         serp = topic.get("serp", {})
@@ -161,9 +172,16 @@ def select(candidates, research=None, today=None):
                 reasons.append("at least one claim needs a current cited source")
             if research_problems:
                 reasons.extend(research_problems)
-            if metrics is None:
+            no_volume = (metrics is None
+                         or all(v["volume"] is None for v in metrics.values()))
+            if no_volume and _fresh_news(topic.get("news"), today):
+                # Providers report last month's searches, so a days-old event
+                # never has volume yet. A dated primary source stands in.
+                notes.append("fresh news: search volume not yet measurable; "
+                             "primary source " + topic["news"]["primary_source_url"])
+            elif metrics is None:
                 reasons.append("keyword metrics missing from research")
-            elif all(v["volume"] is None for v in metrics.values()):
+            elif no_volume:
                 reasons.append("search volume missing from both providers")
             if reasons:
                 decision = "research_needed"
@@ -178,7 +196,7 @@ def select(candidates, research=None, today=None):
         result = {"keyword": keyword, "decision": decision, "score": score,
                   "score_kind": "heuristic priority (0-100), not a ranking or conversion prediction",
                   "persona": persona, "buyer_intent": intent,
-                  "reasons": reasons, "metrics": metrics,
+                  "reasons": reasons, "notes": notes, "metrics": metrics,
                   "research_country": research.get("country") if research else None,
                   "research_collected_on": research.get("collected_on") if research else None}
         if decision == "draft_brief":

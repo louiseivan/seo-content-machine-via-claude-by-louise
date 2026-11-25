@@ -73,8 +73,13 @@ only the fallback when no slug art exists. Two accepted formats:
   into the colorway's ink so the white paper disappears into the field.
 - Transparent-background cutout: pasted as-is at 135% canvas height.
 
-House generation prompt (from the Figma canvas, works in any image
-model, incl. vidiq_generate_thumbnail): "A black and white realistic
+Default generator: `gemini_art.py` (Google Gemini with the house prompt
+below, plus an automatic text/face/logo check). Backup when Gemini is
+unavailable: `engrave_art.py`, which renders a simpler engraving from SVG.
+See SKILL.md step 4.
+
+House generation prompt for an image model, if one is available (from
+the Figma canvas, incl. vidiq_generate_thumbnail): "A black and white realistic
 editorial illustration made with black line pen, showing <subject>,
 engraving/gravure hatching style, pure white background, single centered
 subject, absolutely no text, no letters, no words, no watermark, no
